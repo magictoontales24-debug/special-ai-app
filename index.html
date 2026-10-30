@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10101b">
+<meta name="description" content="Special — create characters, chat, and shape interactive stories.">
+<link rel="manifest" href="manifest.json">
+<title>Special</title>
+<style>
+:root{--bg:#0d0d17;--panel:#171725;--panel2:#202033;--text:#f5f2ff;--muted:#aaa6c2;--accent:#a78bfa;--accent2:#f0abfc;--line:#302e46}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#272044 0,transparent 38%),var(--bg);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}
+button,input,textarea,select{font:inherit}button{cursor:pointer;border:0;color:inherit}
+.app{max-width:760px;margin:auto;min-height:100vh;padding:18px 16px 100px}
+header{display:flex;align-items:center;justify-content:space-between;padding:8px 0 20px}
+.brand{display:flex;gap:10px;align-items:center;font-weight:800;font-size:22px;letter-spacing:-.6px}.logo{width:38px;height:38px;border-radius:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#171222;font-size:21px}
+.pill{background:#28243d;color:#d8ccff;padding:7px 11px;border-radius:30px;font-size:12px}
+h1{font-size:30px;line-height:1.1;margin:12px 0 8px;letter-spacing:-1px}h2{font-size:20px;margin:24px 0 12px}p{color:var(--muted);line-height:1.5;margin:0 0 14px}
+.hero{padding:22px;border:1px solid #39314f;border-radius:24px;background:linear-gradient(135deg,#292044,#211b35 55%,#33203e);margin-bottom:22px}
+.hero .eyebrow{color:#d7baff;font-size:12px;text-transform:uppercase;letter-spacing:1.4px;font-weight:700}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:18px}
+.primary,.secondary,.small{border-radius:13px;padding:12px 16px;font-weight:700}.primary{background:linear-gradient(110deg,var(--accent),var(--accent2));color:#1b1428}.secondary{background:#302b47;color:#eee8ff;border:1px solid #49415f}.small{padding:8px 11px;background:#302b47;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:14px;min-width:0}
+.avatar{height:112px;border-radius:14px;display:grid;place-items:center;font-size:45px;margin-bottom:11px;background:linear-gradient(145deg,#44345f,#26243e)}
+.card h3{margin:0 0 4px;font-size:16px}.tag{font-size:11px;color:#d8c7ff;background:#2b2540;padding:4px 8px;border-radius:20px;display:inline-block;margin:4px 0 8px}
+.card p{font-size:12px;margin:0 0 10px;min-height:36px}
+nav{position:fixed;bottom:0;left:0;right:0;background:#141421ed;backdrop-filter:blur(18px);border-top:1px solid var(--line);display:flex;justify-content:center;z-index:5;padding:9px max(10px,env(safe-area-inset-right)) calc(9px + env(safe-area-inset-bottom))}
+nav button{background:none;color:var(--muted);padding:7px 15px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:76px}nav button.active{color:#d9c5ff}nav b{font-size:20px}
+.screen{display:none}.screen.active{display:block}
+.field{display:block;width:100%;background:#11111d;border:1px solid #39364f;color:var(--text);padding:12px;border-radius:12px;margin:7px 0 14px;outline:none}
+label{font-size:13px;color:#d4cde8;font-weight:650}
+.chatbox{height:54vh;min-height:300px;overflow:auto;background:#12121f;border:1px solid var(--line);border-radius:18px;padding:13px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:88%;padding:11px 13px;border-radius:15px;line-height:1.45;font-size:14px;white-space:pre-wrap}.bot{align-self:flex-start;background:#28243b;border-bottom-left-radius:4px}.me{align-self:flex-end;background:#7559b5;color:white;border-bottom-right-radius:4px}
+.chatbar{display:flex;gap:8px;margin-top:10px}.chatbar input{flex:1;min-width:0;background:#191927;border:1px solid var(--line);border-radius:13px;padding:12px;color:white}
+.choice{display:block;width:100%;text-align:left;background:#28243b;border:1px solid #49415f;padding:13px;border-radius:13px;margin:9px 0}
+.storybox{background:#191827;border:1px solid var(--line);border-radius:18px;padding:18px;line-height:1.65;margin:12px 0}
+.empty{text-align:center;padding:35px 15px;color:var(--muted)}
+.notice{font-size:12px;color:#bcb4d3;background:#201d30;padding:12px;border-radius:12px;margin-top:14px}
+.topline{display:flex;align-items:center;justify-content:space-between;gap:10px}
+@media(min-width:600px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}.app{padding-top:26px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div class="brand"><div class="logo">✦</div>Special</div><span class="pill">Your story, your world</span></header>
+
+<section id="home" class="screen active">
+ <div class="hero"><div class="eyebrow">A universe of conversations</div><h1>Who will you meet<br>today?</h1><p>Chat with characters, create your own, and choose where every story goes.</p><div class="actions"><button class="primary" onclick="show('characters')">Explore characters</button><button class="secondary" onclick="show('create')">＋ Create character</button></div></div>
+ <div class="topline"><h2 style="margin:0">Featured characters</h2><button class="small" onclick="show('characters')">See all</button></div>
+ <div id="featured" class="grid" style="margin-top:12px"></div>
+ <h2>Interactive stories</h2><div class="card"><div class="topline"><div><h3>The Midnight Train</h3><p style="margin:4px 0 0">A mysterious passenger knows your name.</p></div><div style="font-size:35px">🚆</div></div><button class="primary" style="margin-top:12px" onclick="startStory()">Begin story</button></div>
+</section>
+
+<section id="characters" class="screen"><h1>Meet the characters</h1><p>Pick someone to start a conversation.</p><div id="allchars" class="grid"></div></section>
+
+<section id="chat" class="screen"><div class="topline"><div><h1 id="chatTitle" style="font-size:24px;margin:0">Chat</h1><p id="chatSub" style="margin:4px 0 0">Your conversation</p></div><button class="small" onclick="show('characters')">Back</button></div><div id="chatbox" class="chatbox" style="margin-top:14px"></div><div class="chatbar"><input id="message" placeholder="Write a message..." onkeydown="if(event.key==='Enter')sendMessage()"><button class="primary" onclick="sendMessage()">Send</button></div><div class="notice">AI conversations are powered by Gemini. Avoid sharing passwords, financial details, or other highly sensitive information. SPECIAL is a companion, not a therapist or emergency service.</div></section>
+
+<section id="create" class="screen"><h1>Create a character</h1><p>Give your character a name and a personality.</p>
+<label>Character name</label><input class="field" id="cname" placeholder="e.g. Aria">
+<label>Character age (18+)</label><input class="field" id="cage" type="number" min="18" placeholder="e.g. 22">
+<label>Personality</label><input class="field" id="cpersonality" placeholder="e.g. funny, brave, mysterious">
+<label>Short description</label><textarea class="field" id="cdesc" rows="3" placeholder="Who are they? What is their world?"></textarea>
+<label>First greeting</label><textarea class="field" id="cgreeting" rows="2" placeholder="Hey! I'm glad you're here..."></textarea>
+<button class="primary" style="width:100%" onclick="createCharacter()">Save character</button><div id="createStatus" class="notice">Your characters are saved on this device.</div></section>
+
+<section id="stories" class="screen"><h1>Story worlds</h1><p>Make choices and see where the story takes you.</p><div class="card"><div style="font-size:36px">🌙</div><h3>The Midnight Train</h3><p>You board the last train home. A stranger in the opposite seat smiles and says, “I've been waiting for you.”</p><button class="primary" onclick="startStory()">Play story</button></div></section>
+
+<section id="story" class="screen"><div class="topline"><h1 style="margin:0">The Midnight Train</h1><button class="small" onclick="show('stories')">Exit</button></div><div id="storyText" class="storybox"></div><div id="choices"></div></section>
+
+<section id="profile" class="screen"><h1>Your space</h1><div class="card"><div style="font-size:32px">✦</div><h3>Special prototype</h3><p>Your created characters and chat history are stored locally in this browser on this device.</p><button class="secondary" onclick="if(confirm('Clear your locally saved characters and chats?')){localStorage.clear();location.reload()}">Clear local data</button></div><div class="notice"><b>Privacy:</b> This demo stores data in your browser. Avoid entering sensitive personal information. AI replies are sent securely through the app server to Gemini. This prototype does not have accounts or cloud sync.</div></section>
+</div>
+<nav>
+<button class="active" data-screen="home" onclick="show('home')"><b>⌂</b>Home</button>
+<button data-screen="characters" onclick="show('characters')"><b>◉</b>Characters</button>
+<button data-screen="stories" onclick="show('stories')"><b>✧</b>Stories</button>
+<button data-screen="create" onclick="show('create')"><b>＋</b>Create</button>
+<button data-screen="profile" onclick="show('profile')"><b>☻</b>My space</button>
+</nav>
+<script>
+const defaults=[
+ {id:'luna',name:'Luna',age:22,personality:'kind, curious, dreamy',desc:'An astronomy student who sees stories in the stars.',greeting:'Hey there! I was just looking at the stars. Do you have a favourite constellation?',emoji:'🌙'},
+ {id:'kai',name:'Kai',age:24,personality:'witty, adventurous, confident',desc:'A traveller who always has one more secret destination.',greeting:'You look like someone who could use an adventure. Am I right?',emoji:'🧭'},
+ {id:'raven',name:'Raven',age:23,personality:'mysterious, thoughtful, poetic',desc:'A quiet writer with a mysterious past.',greeting:'Funny how some conversations feel like they were meant to happen.',emoji:'🖋️'}
+];
+let custom=JSON.parse(localStorage.getItem('dt_chars')||'[]'), chats=JSON.parse(localStorage.getItem('dt_chats')||'{}'), current=null, storyStep=0;
+const chars=()=>[...defaults,...custom];
+function show(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x.dataset.screen===id));if(id==='characters')renderChars();if(id==='home')renderFeatured();if(id==='chat')renderChat()}
+function card(c){return `<div class="card"><div class="avatar">${c.emoji||'✨'}</div><h3>${esc(c.name)}</h3><span class="tag">${esc(c.personality)}</span><p>${esc(c.desc)}</p><button class="primary" style="width:100%;padding:10px" onclick="openChat('${c.id}')">Chat now</button></div>`}
+function renderFeatured(){document.getElementById('featured').innerHTML=chars().slice(0,2).map(card).join('')}
+function renderChars(){document.getElementById('allchars').innerHTML=chars().map(card).join('')}
+function openChat(id){current=chars().find(c=>c.id===id);if(!current)return;document.getElementById('chatTitle').textContent=current.emoji+' '+current.name;document.getElementById('chatSub').textContent=current.personality; if(!chats[id])chats[id]=[{who:'bot',text:current.greeting}];show('chat')}
+function renderChat(){if(!current)return;let box=document.getElementById('chatbox');box.innerHTML=(chats[current.id]||[]).map(m=>`<div class="msg ${m.who==='me'?'me':'bot'}">${esc(m.text)}</div>`).join('');box.scrollTop=box.scrollHeight}
+async function sendMessage(){let input=document.getElementById('message'),v=input.value.trim();if(!v||!current)return;let sendBtn=document.querySelector('.chatbar button');if(sendBtn.disabled)return;chats[current.id].push({who:'me',text:v});input.value='';localStorage.setItem('dt_chats',JSON.stringify(chats));renderChat();sendBtn.disabled=true;sendBtn.textContent='Thinking…';try{let history=chats[current.id].slice(-16).map(m=>({role:m.who==='me'?'user':'model',text:m.text}));let response=await fetch('/.netlify/functions/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({character:{name:current.name,age:current.age,personality:current.personality,description:current.desc},history})});let data=await response.json();if(!response.ok)throw new Error(data.error||'The AI service could not respond.');chats[current.id].push({who:'bot',text:data.reply});}catch(err){chats[current.id].push({who:'bot',text:'I’m having trouble connecting right now. Please try again in a moment.'});console.error(err)}finally{localStorage.setItem('dt_chats',JSON.stringify(chats));renderChat();sendBtn.disabled=false;sendBtn.textContent='Send'}}
+function createCharacter(){let name=document.getElementById('cname').value.trim(),age=Number(document.getElementById('cage').value),personality=document.getElementById('cpersonality').value.trim(),desc=document.getElementById('cdesc').value.trim(),greeting=document.getElementById('cgreeting').value.trim();if(!name||age<18||!personality||!desc||!greeting){alert('Please fill every field. Character age must be 18 or above.');return}custom.push({id:'u'+Date.now(),name,age,personality,desc,greeting,emoji:'✨'});localStorage.setItem('dt_chars',JSON.stringify(custom));['cname','cage','cpersonality','cdesc','cgreeting'].forEach(id=>document.getElementById(id).value='');document.getElementById('createStatus').textContent='Character saved! Find it in Characters.';renderChars()}
+function startStory(){storyStep=0;show('story');renderStory()}
+const story=[
+ {text:'The midnight train is almost empty. Rain taps against the windows. A stranger looks up from a silver pocket watch. “You are late,” they say, even though you have never met.',choices:[['Ask who they are.',1],['Look at the pocket watch.',2]]},
+ {text:'“Names are complicated here,” the stranger replies. “But you can call me Ellis. I know a way to get you where you need to be.” They offer you a folded map.',choices:[['Take the map.',3],['Refuse and ask the conductor for help.',4]]},
+ {text:'The watch has no hands. Instead, tiny stars move beneath its glass. One constellation looks exactly like the birthmark on your wrist.',choices:[['Show them your wrist.',3],['Put the watch back.',4]]},
+ {text:'The train slows beside a station that does not appear on any map. Golden lights glow beyond the platform. Ellis smiles: “Your next chapter starts here.”',choices:[['Step onto the platform.',5],['Ask Ellis to come with you.',5]]},
+ {text:'The conductor tips their hat. “Some journeys are safer when you choose your own direction.” The train doors open onto a bright, unfamiliar morning.',choices:[['Step into the morning.',5],['Stay on the train.',5]]},
+ {text:'✨ THE END — For now. Every choice can lead to another adventure. Start again to explore a different path.',choices:[['Restart story',0]]}
+];
+function renderStory(){let s=story[storyStep];document.getElementById('storyText').textContent=s.text;document.getElementById('choices').innerHTML=s.choices.map(([t,n])=>`<button class="choice" onclick="storyStep=${n};renderStory()">${esc(t)} →</button>`).join('')}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+renderFeatured();renderChars();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body></html>
