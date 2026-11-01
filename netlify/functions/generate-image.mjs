@@ -9,15 +9,16 @@ const json = (data, status = 200) => new Response(JSON.stringify(data), {
 const safe = (value, max = 500) =>
   String(value || "").trim().slice(0, max);
 
-export default async (req) => {
+export default async (req, runtimeContext = {}) => {
+  const env = runtimeContext.env || process.env;
   if (req.method !== "POST") {
     return json({ error: "Method not allowed" }, 405);
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const supabaseUrl = env.SUPABASE_URL;
+  const anonKey = env.SUPABASE_ANON_KEY;
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
+  const geminiKey = env.GEMINI_API_KEY;
 
   if (!supabaseUrl || !anonKey || !serviceKey || !geminiKey) {
     return json({ error: "Image service is not fully configured" }, 503);
@@ -137,7 +138,8 @@ export default async (req) => {
       mime === "image/jpeg" ? "jpg" :
       mime === "image/webp" ? "webp" : "png";
 
-    const bytes = Buffer.from(imagePart.inlineData.data, "base64");
+    const binary = atob(imagePart.inlineData.data);
+    const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
 
     if (bytes.length > 10 * 1024 * 1024) {
       return json({ error: "Image is too large" }, 502);
