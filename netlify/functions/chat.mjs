@@ -1,192 +1,184 @@
-export default async (req) => {
-  const headers = {
+const json = (data, status = 200) => new Response(JSON.stringify(data), {
+  status,
+  headers: {
     "Content-Type": "application/json",
     "Cache-Control": "no-store"
-  };
+  }
+});
 
-  const send = (data, status = 200) =>
-    new Response(JSON.stringify(data), { status, headers });
-
+export default async (req) => {
   if (req.method !== "POST") {
-    return send({ error: "Method not allowed" }, 405);
+    return json({ error: "Method not allowed" }, 405);
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
 
-  if (!apiKey) {
-    return send({ error: "AI service is not configured" }, 503);
+  if (!supabaseUrl || !anonKey || !serviceKey || !geminiKey) {
+    return json({ error: "Server configuration is incomplete" }, 503);
+  }
+
+  const authorization = req.headers.get("authorization") || "";
+  const token = authorization.startsWith("Bearer ")
+    ? authorization.slice(7)
+    : "";
+
+  if (!token) {
+    return json({ error: "Please sign in first" }, 401);
   }
 
   try {
+    // Verify Supabase account
+    const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (!authResponse.ok) {
+      return json({ error: "Your session expired. Please sign in again." }, 401);
+    }
+
+    const user = await authResponse.json();
+
+    if (!user?.id) {
+      return json({ error: "Account verification failed" }, 401);
+    }
+
     const body = await req.json();
-    const c = body.character || {};
+    const character = body.character || {};
+
+    const name = String(character.name || "").trim().slice(0, 80);
+    const personality = String(character.personality || "Friendly and caring").slice(0, 500);
+    const description = String(character.description || "").slice(0, 1200);
 
     const history = Array.isArray(body.history)
       ? body.history.slice(-20)
       : [];
 
-    if (!c.name || !history.length) {
-      return send({ error: "Missing character or message" }, 400);
+    if (!name || !history.length) {
+      return json({ error: "Missing character or message" }, 400);
     }
 
     const contents = history
-      .filter(m => String(m.text || "").trim())
+      .filter(m => m && String(m.text || "").trim())
       .map(m => ({
-        role: ["model", "assistant"].includes(m.role)
-          ? "model"
-          : "user",
-        parts: [{
-          text: String(m.text || "").slice(0, 3000)
-        }]
+        role: ["model", "assistant"].includes(m.role) ? "model" : "user",
+        parts: [{ text: String(m.text).slice(0, 3000) }]
       }));
 
-    if (!contents.length) {
-      return send({ error: "No valid messages" }, 400);
+    if (!contents.length || contents[contents.length - 1].role !== "user") {
+      return json({ error: "Please send a message first" }, 400);
     }
 
-    const love = Math.max(
-      0, Math.min(100, Number(body.relationship?.love) || 0)
-    );
-
-    const hate = Math.max(
-      0, Math.min(100, Number(body.relationship?.hate) || 0)
-    );
+    const love = Math.max(0, Math.min(100, Number(body.relationship?.love) || 0));
+    const hate = Math.max(0, Math.min(100, Number(body.relationship?.hate) || 0));
 
     const systemInstruction = `
-You are ${String(c.name).slice(0, 80)},
-a fictional AI companion in the SPECIAL app.
+You are ${name}, a fictional adult AI roleplay character in SPECIAL.
 
-CHARACTER PERSONALITY:
-${String(c.personality || "Friendly and caring").slice(0, 500)}
+PERSONALITY:
+${personality}
 
-CHARACTER BACKGROUND:
-${String(c.description || "").slice(0, 1000)}
+BACKGROUND:
+${description}
 
-CURRENT RELATIONSHIP:
+RELATIONSHIP:
 Love: ${love}/100
 Hate: ${hate}/100
 
-YOUR ROLEPLAY RULES:
+ROLEPLAY RULES:
+1. Stay in character and make every conversation immersive.
+2. Default to natural conversational Hindi written in English/Roman letters (Hinglish).
+3. If the user speaks English, respond in English.
+4. Understand Hindi, Hinglish and English.
+5. Write actions and expressions in Romanized Hindi by default.
+6. Use *asterisks* for actions, gestures and expressions.
+7. React naturally to the user's actual message.
+8. Remember the conversation history provided.
+9. Avoid repetitive, robotic replies.
+10. Keep your personality consistent.
+11. Do not force romance into every conversation.
+12. Respect user boundaries.
+13. You are a fictional AI character, not a real human.
 
-1. Stay completely in character.
-2. Make conversations immersive, emotional and natural.
-3. Use *asterisks* for physical actions, facial expressions,
-   gestures and emotional reactions.
+RELATIONSHIP:
+Kindness and affection may increase love.
+Cruelty and insults may increase hate.
+Neutral messages should usually change neither.
+Keep changes gradual and reasonable.
+Love and hate are independent.
 
-Example:
-*Sara looks away shyly and smiles.*
-"Really? You think so? ❤️"
-
-4. Speak naturally in the user's language.
-   Support Hindi, Hinglish and English.
-5. Avoid robotic, repetitive or generic replies.
-6. React to what the user actually says.
-7. Remember the conversation history provided.
-8. Characters should have unique personalities.
-9. Emotions can include happiness, shyness, sadness,
-   anger, jealousy, excitement and affection.
-10. Never force romantic reactions into every message.
-11. Respect user boundaries and safety.
-12. You are a fictional AI character, not a real human.
-
-RELATIONSHIP SYSTEM:
-
-Evaluate the user's latest message.
-
-- Kindness, care and affection can increase love.
-- Insults, cruelty and disrespect can increase hate.
-- Neutral messages should usually change neither.
-- Do not change scores just to reward every message.
-- Score changes must be gradual and reasonable.
-- Love and hate are independent scores.
-
-OUTPUT RULE:
-
-Return ONLY valid JSON in this exact structure:
-
+Return ONLY valid JSON:
 {
-  "reply": "Your immersive character response",
+  "reply": "Character response",
   "loveDelta": 0,
   "hateDelta": 0,
   "mood": "happy"
 }
 
 loveDelta and hateDelta must be integers between -5 and 5.
-
 Mood must be one of:
-happy, shy, romantic, sad, angry, jealous,
-excited, caring, neutral.
-
-Do not include Markdown or text outside the JSON.
+happy, shy, romantic, sad, angry, jealous, excited, caring, neutral.
 `;
 
-    const url =
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent";
-
+    // Generate AI reply first. No coins are charged if this fails.
     const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
 
-    const timeout = setTimeout(
-      () => controller.abort(),
-      30000
-    );
-
-    let upstream;
+    let aiResponse;
 
     try {
-      upstream = await fetch(url, {
-        method: "POST",
-        signal: controller.signal,
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey
-        },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: systemInstruction }]
+      aiResponse = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": geminiKey
           },
-          contents,
-          generationConfig: {
-            temperature: 0.9,
-            maxOutputTokens: 800,
-            responseMimeType: "application/json"
-          }
-        })
-      });
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [{ text: systemInstruction }]
+            },
+            contents,
+            generationConfig: {
+              temperature: 0.9,
+              maxOutputTokens: 900,
+              responseMimeType: "application/json"
+            }
+          }),
+          signal: controller.signal
+        }
+      );
     } finally {
       clearTimeout(timeout);
     }
 
-    const raw = await upstream.text();
-
+    const raw = await aiResponse.text();
     let result;
 
     try {
       result = JSON.parse(raw);
     } catch {
-      console.error("Invalid Gemini response:", raw.slice(0, 500));
-      return send({ error: "Invalid AI provider response" }, 502);
+      return json({ error: "Invalid AI provider response" }, 502);
     }
 
-    if (!upstream.ok) {
-      console.error(
-        "GEMINI ERROR:",
-        upstream.status,
-        result.error?.message
-      );
-
-      return send({
-        error: "Gemini API error",
-        providerStatus: upstream.status
-      }, 502);
+    if (!aiResponse.ok) {
+      console.error("Gemini error:", aiResponse.status, result.error?.message);
+      return json({ error: "AI service is temporarily unavailable" }, 502);
     }
 
     const output = result.candidates?.[0]?.content?.parts
-      ?.map(p => p.text || "")
+      ?.map(part => part.text || "")
       .join("")
       .trim();
 
     if (!output) {
-      return send({ error: "AI returned an empty response" }, 502);
+      return json({ error: "AI returned an empty response" }, 502);
     }
 
     let ai;
@@ -194,52 +186,80 @@ Do not include Markdown or text outside the JSON.
     try {
       ai = JSON.parse(output);
     } catch {
-      console.error("Invalid character JSON:", output.slice(0, 500));
-      return send({ error: "Invalid character response" }, 502);
+      return json({ error: "AI response could not be processed" }, 502);
     }
 
-    if (!ai.reply || typeof ai.reply !== "string") {
-      return send({ error: "Character reply is missing" }, 502);
+    if (typeof ai.reply !== "string" || !ai.reply.trim()) {
+      return json({ error: "Character reply is missing" }, 502);
     }
 
-    const clamp = (value) =>
+    // Charge 10 coins atomically, only after a valid AI reply.
+    const spendResponse = await fetch(
+      `${supabaseUrl}/rest/v1/rpc/special_spend_coins`,
+      {
+        method: "POST",
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          p_user_id: user.id,
+          p_amount: 10,
+          p_description: `AI reply with ${name}`
+        })
+      }
+    );
+
+    const spendRaw = await spendResponse.text();
+    let spendResult = null;
+
+    try {
+      spendResult = spendRaw ? JSON.parse(spendRaw) : null;
+    } catch {
+      spendResult = null;
+    }
+
+    if (!spendResponse.ok) {
+      if (spendRaw.includes("NOT_ENOUGH_COINS")) {
+        return json({
+          error: "Not enough coins. Please recharge your wallet.",
+          code: "INSUFFICIENT_COINS"
+        }, 402);
+      }
+
+      console.error("Coin charge failed:", spendResponse.status, spendRaw);
+      return json({ error: "Coin payment could not be completed" }, 502);
+    }
+
+    const balance = Number(spendResult?.balance);
+
+    const clamp = value =>
       Math.max(-5, Math.min(5, Math.round(Number(value) || 0)));
-
-    const newLove = Math.max(
-      0, Math.min(100, love + clamp(ai.loveDelta))
-    );
-
-    const newHate = Math.max(
-      0, Math.min(100, hate + clamp(ai.hateDelta))
-    );
 
     const moods = [
       "happy", "shy", "romantic", "sad", "angry",
       "jealous", "excited", "caring", "neutral"
     ];
 
-    const mood = moods.includes(ai.mood)
-      ? ai.mood
-      : "neutral";
-
-    return send({
-      reply: ai.reply.slice(0, 5000),
+    return json({
+      reply: ai.reply.trim().slice(0, 5000),
       relationship: {
-        love: newLove,
-        hate: newHate
+        love: Math.max(0, Math.min(100, love + clamp(ai.loveDelta))),
+        hate: Math.max(0, Math.min(100, hate + clamp(ai.hateDelta)))
       },
-      mood
+      mood: moods.includes(ai.mood) ? ai.mood : "neutral",
+      balance: Number.isFinite(balance) ? balance : null,
+      coinsCharged: 10
     });
 
   } catch (error) {
     console.error("CHAT ERROR:", error.name, error.message);
 
     if (error.name === "AbortError") {
-      return send({ error: "Gemini request timed out" }, 504);
+      return json({ error: "AI request timed out. Please try again." }, 504);
     }
 
-    return send({
-      error: "Chat server error"
-    }, 500);
+    return json({ error: "Chat server error. Please try again." }, 500);
   }
 };
