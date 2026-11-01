@@ -6,15 +6,16 @@ const json = (data, status = 200) => new Response(JSON.stringify(data), {
   }
 });
 
-export default async (req) => {
+export default async (req, runtimeContext = {}) => {
+  const env = runtimeContext.env || process.env;
   if (req.method !== "POST") {
     return json({ error: "Method not allowed" }, 405);
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const supabaseUrl = env.SUPABASE_URL;
+  const anonKey = env.SUPABASE_ANON_KEY;
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
+  const geminiKey = env.GEMINI_API_KEY;
 
   if (!supabaseUrl || !anonKey || !serviceKey || !geminiKey) {
     return json({ error: "Server configuration is incomplete" }, 503);
