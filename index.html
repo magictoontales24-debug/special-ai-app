@@ -314,12 +314,12 @@ label{font-size:13px;color:#d4cde8;font-weight:650}
   <div class="wallet-section">
     <h2 style="margin-top:0">Get more coins</h2>
     <div class="package-grid">
-      <div class="coin-package"><b>1,000</b><span>coins</span><strong>₹20</strong></div>
-      <div class="coin-package"><b>2,250</b><span>coins</span><strong>₹40</strong></div>
-      <div class="coin-package"><b>5,000</b><span>coins</span><strong>₹80</strong></div>
-      <div class="coin-package"><b>50,000</b><span>coins</span><strong>₹700</strong></div>
+      <button class="coin-package" type="button" onclick="buyCoins('starter')" style="width:100%;text-align:left;background:#242238;color:inherit;border:1px solid #3a3451"><b>1,000</b><span>coins · Tap to buy</span><strong>₹20</strong></button>
+      <button class="coin-package" type="button" onclick="buyCoins('plus')" style="width:100%;text-align:left;background:#242238;color:inherit;border:1px solid #3a3451"><b>2,250</b><span>coins · Tap to buy</span><strong>₹40</strong></button>
+      <button class="coin-package" type="button" onclick="buyCoins('pro')" style="width:100%;text-align:left;background:#242238;color:inherit;border:1px solid #3a3451"><b>5,000</b><span>coins · Tap to buy</span><strong>₹80</strong></button>
+      <button class="coin-package" type="button" onclick="buyCoins('mega')" style="width:100%;text-align:left;background:#242238;color:inherit;border:1px solid #3a3451"><b>50,000</b><span>coins · Tap to buy</span><strong>₹700</strong></button>
     </div>
-    <p class="wallet-message">Secure checkout is being connected. Coin packages are displayed here; payments are not enabled yet.</p>
+    <p class="wallet-message" id="paymentMessage" role="status">Secure Razorpay checkout. Coins are added only after payment is verified.</p>
   </div>
   <div class="wallet-section">
     <h2 style="margin-top:0">Recent activity</h2>
@@ -688,6 +688,92 @@ function createCharacter(){
 
 
 let walletData={balance:null,transactions:[],claims:[],nextDay:1,claimedToday:false};
+const SPECIAL_PACKAGES = {
+  starter:{label:'1,000 SPECIAL coins',coins:1000,price:20},
+  plus:{label:'2,250 SPECIAL coins',coins:2250,price:40},
+  pro:{label:'5,000 SPECIAL coins',coins:5000,price:80},
+  mega:{label:'50,000 SPECIAL coins',coins:50000,price:700}
+};
+let razorpayLoader=null;
+async function ensureRazorpay(){
+  if(window.Razorpay)return;
+  if(!razorpayLoader){
+    razorpayLoader=new Promise((resolve,reject)=>{
+      const script=document.createElement('script');
+      script.src='https://checkout.razorpay.com/v1/checkout.js';
+      script.onload=resolve;
+      script.onerror=()=>reject(new Error('Razorpay checkout could not load. Please check your connection.'));
+      document.head.appendChild(script);
+    });
+  }
+  await razorpayLoader;
+}
+async function paymentRequest(body){
+  if(!accessToken)throw new Error('Please sign in before buying coins.');
+  const response=await fetch('/.netlify/functions/payment',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},
+    body:JSON.stringify(body)
+  });
+  const data=await response.json();
+  if(!response.ok)throw new Error(data.error||'Payment request failed.');
+  return data;
+}
+async function buyCoins(packageId){
+  const pack=SPECIAL_PACKAGES[packageId];
+  const message=document.getElementById('paymentMessage');
+  if(!pack)return;
+  if(!accessToken){message.textContent='Please sign in before buying coins.';return;}
+  const buttons=document.querySelectorAll('.coin-package');
+  buttons.forEach(button=>button.disabled=true);
+  message.textContent='Preparing secure checkout…';
+  try{
+    await ensureRazorpay();
+    const order=await paymentRequest({action:'create',packageId});
+    const checkout=new window.Razorpay({
+      key:order.keyId,
+      amount:order.amount,
+      currency:order.currency,
+      name:'SPECIAL',
+      description:pack.label,
+      order_id:order.orderId,
+      prefill:{},
+      theme:{color:'#c084fc'},
+      handler:async function(result){
+        message.textContent='Verifying your payment securely…';
+        try{
+          const verified=await paymentRequest({
+            action:'verify',
+            razorpay_order_id:result.razorpay_order_id,
+            razorpay_payment_id:result.razorpay_payment_id,
+            razorpay_signature:result.razorpay_signature
+          });
+          message.textContent=verified.alreadyCredited
+            ? 'This payment was already added to your wallet.'
+            : 'Payment successful! '+Number(verified.coins).toLocaleString('en-IN')+' coins added.';
+          await loadWallet();
+        }catch(error){
+          message.textContent=error.message+' If money was deducted, contact SPECIAL support with your Razorpay payment ID: '+result.razorpay_payment_id;
+        }finally{
+          buttons.forEach(button=>button.disabled=false);
+        }
+      },
+      modal:{ondismiss:function(){
+        message.textContent='Checkout closed. No coins were added.';
+        buttons.forEach(button=>button.disabled=false);
+      }}
+    });
+    checkout.on('payment.failed',function(){
+      message.textContent='Payment failed or was cancelled. No coins were added.';
+      buttons.forEach(button=>button.disabled=false);
+    });
+    checkout.open();
+  }catch(error){
+    message.textContent=error.message;
+    buttons.forEach(button=>button.disabled=false);
+  }
+}
+
 async function walletRequest(method='GET'){
   if(!accessToken) throw new Error('Please sign in again to view your wallet.');
   const response=await fetch('/.netlify/functions/wallet',{
