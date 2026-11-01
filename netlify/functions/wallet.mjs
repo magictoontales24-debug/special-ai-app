@@ -3,14 +3,15 @@ const json = (data, status = 200) => new Response(JSON.stringify(data), {
   headers: { "Content-Type": "application/json", "Cache-Control": "no-store" }
 });
 
-export default async (req) => {
+export default async (req, runtimeContext = {}) => {
+  const env = runtimeContext.env || process.env;
   if (!["GET", "POST"].includes(req.method)) {
     return json({ error: "Method not allowed" }, 405);
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = env.SUPABASE_URL;
+  const anonKey = env.SUPABASE_ANON_KEY;
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !anonKey || !serviceKey) {
     return json({ error: "Wallet service configuration is incomplete" }, 503);
   }
