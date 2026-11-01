@@ -1,0 +1,4 @@
+import handler from "../../netlify/functions/wallet.mjs";
+export async function onRequest(context) {
+  return handler(context.request, { env: context.env });
+}
