@@ -351,7 +351,7 @@ async function bootAuth(){
   const gate=document.getElementById('authGate');
   const note=document.getElementById('authNote');
   try{
-    const configResponse=await fetch('/.netlify/functions/auth-config',{cache:'no-store'});
+    const configResponse=await fetch('/api/auth-config',{cache:'no-store'});
     const config=await configResponse.json();
     if(!configResponse.ok) throw new Error(config.error||'Could not load account settings.');
     if(!window.supabase?.createClient) throw new Error('Account library did not load. Refresh this page.');
@@ -590,7 +590,7 @@ async function sendMessage(){
       text:m.text
     }));
 
-    const response=await fetch('/.netlify/functions/chat',{
+    const response=await fetch('/api/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json',...(accessToken?{'Authorization':'Bearer '+accessToken}:{})},
       body:JSON.stringify({
@@ -710,7 +710,7 @@ async function ensureRazorpay(){
 }
 async function paymentRequest(body){
   if(!accessToken)throw new Error('Please sign in before buying coins.');
-  const response=await fetch('/.netlify/functions/payment',{
+  const response=await fetch('/api/payment',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},
     body:JSON.stringify(body)
@@ -776,7 +776,7 @@ async function buyCoins(packageId){
 
 async function walletRequest(method='GET'){
   if(!accessToken) throw new Error('Please sign in again to view your wallet.');
-  const response=await fetch('/.netlify/functions/wallet',{
+  const response=await fetch('/api/wallet',{
     method,headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken}
   });
   const data=await response.json();
