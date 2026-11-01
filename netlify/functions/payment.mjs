@@ -1,5 +1,3 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
-
 const json = (data, status = 200) => new Response(JSON.stringify(data), {
   status,
   headers: { "Content-Type": "application/json", "Cache-Control": "no-store" }
@@ -13,9 +11,9 @@ const PACKAGES = {
 };
 
 async function getUser(req) {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = env.SUPABASE_URL;
+  const anonKey = env.SUPABASE_ANON_KEY;
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !anonKey || !serviceKey) throw new Error("Supabase payment configuration is incomplete.");
   const authorization = req.headers.get("authorization") || "";
   const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
@@ -30,22 +28,32 @@ async function getUser(req) {
 }
 
 function razorpayAuth(keyId, secret) {
-  return "Basic " + Buffer.from(`${keyId}:${secret}`).toString("base64");
+  return "Basic " + btoa(`${keyId}:${secret}`);
+}
+
+async function hmacHex(secret, message) {
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
+  return Array.from(new Uint8Array(signature), byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function safeEqualHex(a, b) {
   if (!/^[a-f0-9]{64}$/i.test(a || "") || !/^[a-f0-9]{64}$/i.test(b || "")) return false;
-  const aa = Buffer.from(a, "hex");
-  const bb = Buffer.from(b, "hex");
-  return aa.length === bb.length && timingSafeEqual(aa, bb);
+  let mismatch = 0;
+  for (let i = 0; i < 64; i++) mismatch |= a.toLowerCase().charCodeAt(i) ^ b.toLowerCase().charCodeAt(i);
+  return mismatch === 0;
 }
 
-export default async (req) => {
+export default async (req, runtimeContext = {}) => {
+  const env = runtimeContext.env || process.env;
   if (req.method !== "POST") return json({ error: "Method not allowed." }, 405);
 
-  const keyId = process.env.RAZORPAY_KEY_ID;
-  const keySecret = process.env.RAZORPAY_KEY_SECRET;
-  if (!keyId || !keySecret) return json({ error: "Razorpay is not configured yet. Add the Razorpay API keys in Netlify." }, 503);
+  const keyId = env.RAZORPAY_KEY_ID;
+  const keySecret = env.RAZORPAY_KEY_SECRET;
+  if (!keyId || !keySecret) return json({ error: "Razorpay is not configured yet. Add the Razorpay API keys in your hosting settings." }, 503);
 
   try {
     const auth = await getUser(req);
@@ -126,9 +134,7 @@ export default async (req) => {
       const savedOrder = rows[0];
       if (!savedOrder) return json({ error: "This payment order does not belong to your account." }, 403);
 
-      const expected = createHmac("sha256", keySecret)
-        .update(`${savedOrder.razorpay_order_id}|${paymentId}`)
-        .digest("hex");
+      const expected = await hmacHex(keySecret, `${savedOrder.razorpay_order_id}|${paymentId}`);
       if (!safeEqualHex(expected, signature)) return json({ error: "Payment signature verification failed." }, 400);
 
       const paymentResponse = await fetch(`https://api.razorpay.com/v1/payments/${encodeURIComponent(paymentId)}`, {
