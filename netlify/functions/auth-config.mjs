@@ -1,6 +1,7 @@
-export default async () => {
-  const url = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
+export default async (_req, runtimeContext = {}) => {
+  const env = runtimeContext.env || process.env;
+  const url = env.SUPABASE_URL;
+  const anonKey = env.SUPABASE_ANON_KEY;
   if (!url || !anonKey) {
     return new Response(JSON.stringify({ error: "Supabase is not configured on the server." }), {
       status: 503,
