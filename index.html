@@ -125,6 +125,32 @@ label{font-size:13px;color:#d4cde8;font-weight:650}
   border:1px solid #49415f;padding:13px;border-radius:13px;margin:9px 0;
 }
 .storybox{background:#191827;border:1px solid var(--line);border-radius:18px;padding:18px;line-height:1.65;margin:12px 0}
+.wallet-heading{display:flex;justify-content:space-between;align-items:center;margin:8px 0 18px}
+.wallet-heading h1{margin:7px 0 4px}
+.wallet-mark{width:48px;height:48px;border-radius:16px;background:linear-gradient(135deg,#a78bfa,#f0abfc);color:#21152f;display:grid;place-items:center;font-size:25px}
+.wallet-balance{padding:22px;border-radius:22px;border:1px solid #594477;background:radial-gradient(ellipse at 90% 0%,#62438c 0,transparent 52%),linear-gradient(135deg,#302044,#1c1a30);box-shadow:0 16px 45px #0003}
+.wallet-label{font-size:11px;letter-spacing:1.5px;color:#d6c5f5;font-weight:800}
+.wallet-total{display:flex;align-items:center;gap:10px;margin:8px 0}
+.wallet-total span{font-size:30px;color:#f0abfc}
+.wallet-total strong{font-size:42px;letter-spacing:-1px}
+.wallet-foot{color:#c5bad9;font-size:12px;margin:0 0 16px}
+.wallet-section{background:#171725;border:1px solid var(--line);border-radius:18px;padding:16px;margin-top:14px}
+.reward-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;margin-top:15px}
+.reward-days div{background:#242238;border:1px solid #38324d;border-radius:10px;padding:9px 2px;text-align:center;display:flex;flex-direction:column;gap:5px}
+.reward-days b{font-size:14px;color:#f0d5ff}
+.reward-days small{font-size:9px;color:#aaa6c2}
+.reward-days .claimed{background:#33264b;border-color:#a78bfa}
+.wallet-message{font-size:12px;color:#bdb3d1;line-height:1.5;margin:10px 0 0;min-height:16px}
+.package-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.coin-package{display:grid;grid-template-columns:1fr auto;align-items:center;background:#242238;border:1px solid #3a3451;border-radius:13px;padding:12px}
+.coin-package b{font-size:17px}.coin-package span{font-size:11px;color:#aaa6c2}.coin-package strong{grid-column:2;grid-row:1/3;color:#f0abfc;font-size:17px}
+.transactions{display:flex;flex-direction:column;gap:8px}
+.transaction{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #302e46}
+.transaction:last-child{border-bottom:0}
+.transaction b{font-size:13px}.transaction small{display:block;color:#aaa6c2;font-size:11px;margin-top:3px}
+.transaction .positive{color:#86efac;font-weight:750}.transaction .negative{color:#fda4af;font-weight:750}
+.wallet-account{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+
 @media(min-width:600px){
   .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
   .app{padding-top:26px}
@@ -267,21 +293,43 @@ label{font-size:13px;color:#d4cde8;font-weight:650}
 </section>
 
 <section id="profile" class="screen">
-  <h1>Your space</h1>
-  <div class="card">
-    <div style="font-size:32px">✦</div>
-    <h3>Special</h3>
-    <p id="accountEmail"></p>
-    <button class="secondary" onclick="signOut()" style="margin-bottom:12px">Sign out</button>
-    <p>Your created characters, relationship scores and chat history are stored locally in this browser on this device.</p>
-    <button class="secondary" onclick="clearLocalData()">Clear local data</button>
+  <div class="wallet-heading">
+    <div><div class="eyebrow">SPECIAL MEMBERSHIP</div><h1>Your space</h1><p id="accountEmail"></p></div>
+    <div class="wallet-mark">✦</div>
   </div>
-  <div class="notice">
-    <b>Privacy:</b> This demo stores data in your browser.
-    Avoid entering sensitive personal information.
-    AI replies are sent through the app server to Gemini.
-    This prototype does not have accounts or cloud sync.
+  <div class="wallet-balance">
+    <div class="wallet-label">YOUR COIN BALANCE</div>
+    <div class="wallet-total"><span>✦</span><strong id="walletBalance">—</strong></div>
+    <div class="wallet-foot">10 coins are used for each successful AI reply.</div>
+    <button class="primary" onclick="refreshWallet()">↻ Refresh balance</button>
   </div>
+  <div class="wallet-section">
+    <div class="topline"><div><h2 style="margin:0">Daily rewards</h2><p style="margin:5px 0 0">Come back every day to keep your streak.</p></div><span class="tag" id="rewardDay">Day —</span></div>
+    <div class="reward-days" id="rewardDays">
+      <div><b>15</b><small>DAY 1</small></div><div><b>20</b><small>DAY 2</small></div><div><b>25</b><small>DAY 3</small></div><div><b>50</b><small>DAY 4</small></div><div><b>70</b><small>DAY 5</small></div><div><b>80</b><small>DAY 6</small></div><div><b>?</b><small>DAY 7</small></div>
+    </div>
+    <button class="primary" id="claimRewardBtn" onclick="claimDailyReward()" style="width:100%;margin-top:13px">Claim daily reward</button>
+    <div class="wallet-message" id="walletMessage" role="status"></div>
+  </div>
+  <div class="wallet-section">
+    <h2 style="margin-top:0">Get more coins</h2>
+    <div class="package-grid">
+      <div class="coin-package"><b>2,000</b><span>coins</span><strong>₹20</strong></div>
+      <div class="coin-package"><b>4,500</b><span>coins</span><strong>₹40</strong></div>
+      <div class="coin-package"><b>10,000</b><span>coins</span><strong>₹80</strong></div>
+      <div class="coin-package"><b>100,000</b><span>coins</span><strong>₹700</strong></div>
+    </div>
+    <p class="wallet-message">Secure checkout is being connected. Coin packages are displayed here; payments are not enabled yet.</p>
+  </div>
+  <div class="wallet-section">
+    <h2 style="margin-top:0">Recent activity</h2>
+    <div id="walletTransactions" class="transactions"><p>Loading transactions…</p></div>
+  </div>
+  <div class="wallet-account">
+    <button class="secondary" onclick="signOut()">Sign out</button>
+    <button class="secondary" onclick="clearLocalData()">Clear this device's chat data</button>
+  </div>
+  <div class="notice">Your coin balance and transaction history are stored securely in your SPECIAL account. Your character chats remain saved on this device for now.</div>
 </section>
 
 </div>
@@ -438,6 +486,7 @@ function show(id){
   if(id==='characters')renderChars();
   if(id==='home')renderFeatured();
   if(id==='chat')renderChat();
+  if(id==='profile')loadWallet();
 }
 
 function esc(s){
@@ -635,6 +684,62 @@ function createCharacter(){
   document.getElementById('createStatus').textContent=
     'Character saved! Find it in Characters.';
   renderChars();
+}
+
+
+let walletData={balance:null,transactions:[],claims:[],nextDay:1,claimedToday:false};
+async function walletRequest(method='GET'){
+  if(!accessToken) throw new Error('Please sign in again to view your wallet.');
+  const response=await fetch('/.netlify/functions/wallet',{
+    method,headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken}
+  });
+  const data=await response.json();
+  if(!response.ok) throw new Error(data.error||'Wallet could not be loaded.');
+  return data;
+}
+function renderWallet(){
+  document.getElementById('walletBalance').textContent=walletData.balance===null?'—':Number(walletData.balance).toLocaleString('en-IN');
+  document.getElementById('rewardDay').textContent='Day '+(walletData.nextDay||1);
+  const btn=document.getElementById('claimRewardBtn');
+  btn.disabled=!!walletData.claimedToday;
+  btn.textContent=walletData.claimedToday?'Reward claimed today':'Claim daily reward';
+  const days=document.querySelectorAll('#rewardDays div');
+  days.forEach((el,i)=>el.classList.toggle('claimed',i+1<(walletData.nextDay||1)||(walletData.claimedToday&&i+1===(walletData.nextDay||1))));
+  const list=document.getElementById('walletTransactions');
+  if(!walletData.transactions.length){list.innerHTML='<p>No wallet activity yet. Your welcome bonus and future rewards will appear here.</p>';return;}
+  list.innerHTML=walletData.transactions.map(t=>{
+    const amount=Number(t.amount)||0;
+    const date=t.created_at?new Date(t.created_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}):'';
+    return '<div class="transaction"><div><b>'+esc(t.description||t.kind||'Wallet activity')+'</b><small>'+esc(date)+'</small></div><span class="'+(amount>=0?'positive':'negative')+'">'+(amount>0?'+':'')+amount.toLocaleString('en-IN')+' ✦</span></div>';
+  }).join('');
+}
+async function loadWallet(){
+  const message=document.getElementById('walletMessage');
+  message.textContent='Loading your secure wallet…';
+  try{
+    walletData=await walletRequest('GET');
+    renderWallet();
+    message.textContent=walletData.claimedToday?'You have already claimed today’s reward.':'Your wallet is up to date.';
+  }catch(error){
+    message.textContent=error.message;
+    document.getElementById('walletBalance').textContent='—';
+    document.getElementById('walletTransactions').innerHTML='<p>Wallet could not be loaded. Please refresh.</p>';
+  }
+}
+async function refreshWallet(){await loadWallet();}
+async function claimDailyReward(){
+  const btn=document.getElementById('claimRewardBtn');
+  const message=document.getElementById('walletMessage');
+  btn.disabled=true;btn.textContent='Claiming…';message.textContent='';
+  try{
+    const result=await walletRequest('POST');
+    message.textContent='You received '+Number(result.coins).toLocaleString('en-IN')+' coins for Day '+result.day+'!';
+    await loadWallet();
+    message.textContent='You received '+Number(result.coins).toLocaleString('en-IN')+' coins for Day '+result.day+'!';
+  }catch(error){
+    message.textContent=error.message;
+    btn.disabled=false;btn.textContent='Claim daily reward';
+  }
 }
 
 function clearLocalData(){
