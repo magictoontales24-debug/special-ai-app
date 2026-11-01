@@ -58,8 +58,7 @@ Respect user safety, privacy and personal boundaries.
 `;
 
     const url =
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent";
-
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent";
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 25000);
 
