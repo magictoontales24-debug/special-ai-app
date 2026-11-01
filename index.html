@@ -129,10 +129,34 @@ label{font-size:13px;color:#d4cde8;font-weight:650}
   .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
   .app{padding-top:26px}
 }
+
+.auth-gate{position:fixed;inset:0;z-index:20;display:none;place-items:center;padding:22px;background:radial-gradient(ellipse at 20% 0%,#30234e 0,transparent 45%),#0d0d17}
+.auth-gate.show{display:grid}
+.auth-card{width:min(100%,440px);background:#171725;border:1px solid #39314f;border-radius:24px;padding:24px;box-shadow:0 24px 80px #0008}
+.auth-card h1{margin-top:8px}
+.auth-note{font-size:12px;color:#aaa6c2;min-height:20px;margin-top:12px}
+.auth-switch{background:none;color:#d8c7ff;text-decoration:underline;padding:8px}
 </style>
 </head>
 
 <body>
+<div id="authGate" class="auth-gate">
+  <div class="auth-card">
+    <div class="brand"><div class="logo">✦</div>SPECIAL</div>
+    <div class="eyebrow" style="margin-top:24px">Your story starts here</div>
+    <h1 id="authHeading">Welcome back</h1>
+    <p id="authDescription">Sign in to continue your conversations and wallet.</p>
+    <form id="authForm">
+      <label for="authEmail">Email</label>
+      <input class="field" id="authEmail" type="email" autocomplete="email" required placeholder="you@example.com">
+      <label for="authPassword">Password</label>
+      <input class="field" id="authPassword" type="password" autocomplete="current-password" minlength="6" required placeholder="At least 6 characters">
+      <button class="primary" id="authSubmit" type="submit" style="width:100%">Sign in</button>
+    </form>
+    <button class="auth-switch" id="authToggle" type="button">Create a new account</button>
+    <div class="auth-note" id="authNote" role="status"></div>
+  </div>
+</div>
 <div class="app">
 
 <header>
@@ -247,6 +271,8 @@ label{font-size:13px;color:#d4cde8;font-weight:650}
   <div class="card">
     <div style="font-size:32px">✦</div>
     <h3>Special</h3>
+    <p id="accountEmail"></p>
+    <button class="secondary" onclick="signOut()" style="margin-bottom:12px">Sign out</button>
     <p>Your created characters, relationship scores and chat history are stored locally in this browser on this device.</p>
     <button class="secondary" onclick="clearLocalData()">Clear local data</button>
   </div>
@@ -269,6 +295,92 @@ label{font-size:13px;color:#d4cde8;font-weight:650}
 </nav>
 
 <script>
+let supabaseClient=null;
+let authMode='signin';
+let accessToken=null;
+
+async function bootAuth(){
+  const gate=document.getElementById('authGate');
+  const note=document.getElementById('authNote');
+  try{
+    const configResponse=await fetch('/.netlify/functions/auth-config',{cache:'no-store'});
+    const config=await configResponse.json();
+    if(!configResponse.ok) throw new Error(config.error||'Could not load account settings.');
+    if(!window.supabase?.createClient) throw new Error('Account library did not load. Refresh this page.');
+    supabaseClient=window.supabase.createClient(config.url,config.anonKey);
+    const {data:{session},error}=await supabaseClient.auth.getSession();
+    if(error) throw error;
+    if(session){
+      accessToken=session.access_token;
+      gate.classList.remove('show');
+      document.getElementById('accountEmail').textContent=session.user.email||'Signed in';
+    }else{
+      gate.classList.add('show');
+    }
+    supabaseClient.auth.onAuthStateChange((_event,session)=>{
+      accessToken=session?.access_token||null;
+      if(session){
+        gate.classList.remove('show');
+        document.getElementById('accountEmail').textContent=session.user.email||'Signed in';
+      }else{
+        gate.classList.add('show');
+      }
+    });
+  }catch(error){
+    gate.classList.add('show');
+    note.textContent=error.message||'Account setup failed. Check your Netlify environment variables.';
+  }
+}
+
+document.getElementById('authToggle').addEventListener('click',()=>{
+  authMode=authMode==='signin'?'signup':'signin';
+  document.getElementById('authHeading').textContent=authMode==='signin'?'Welcome back':'Create your account';
+  document.getElementById('authDescription').textContent=authMode==='signin'?'Sign in to continue your conversations and wallet.':'Create an account to save your SPECIAL experience.';
+  document.getElementById('authSubmit').textContent=authMode==='signin'?'Sign in':'Create account';
+  document.getElementById('authToggle').textContent=authMode==='signin'?'Create a new account':'I already have an account';
+  document.getElementById('authNote').textContent='';
+});
+
+document.getElementById('authForm').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const email=document.getElementById('authEmail').value.trim();
+  const password=document.getElementById('authPassword').value;
+  const button=document.getElementById('authSubmit');
+  const note=document.getElementById('authNote');
+  button.disabled=true;
+  button.textContent='Please wait…';
+  note.textContent='';
+  try{
+    if(!supabaseClient) throw new Error('Account service is not ready. Refresh and try again.');
+    const result=authMode==='signup'
+      ? await supabaseClient.auth.signUp({email,password})
+      : await supabaseClient.auth.signInWithPassword({email,password});
+    if(result.error) throw result.error;
+    if(authMode==='signup'&&!result.data.session){
+      note.textContent='Account created. Check your email to confirm it, then sign in.';
+      return;
+    }
+    accessToken=result.data.session?.access_token||null;
+    if(!accessToken) throw new Error('No active session. Please sign in again.');
+    document.getElementById('authGate').classList.remove('show');
+    document.getElementById('accountEmail').textContent=result.data.user.email||email;
+    note.textContent='Signed in successfully.';
+  }catch(error){
+    note.textContent=error.message||'Could not sign in. Please try again.';
+  }finally{
+    button.disabled=false;
+    button.textContent=authMode==='signin'?'Sign in':'Create account';
+  }
+});
+
+async function signOut(){
+  if(!supabaseClient)return;
+  await supabaseClient.auth.signOut();
+  accessToken=null;
+  document.getElementById('authGate').classList.add('show');
+  show('home');
+}
+
 const defaults=[
   {id:'luna',name:'Luna',age:22,personality:'kind, curious, dreamy',desc:'An astronomy student who sees stories in the stars.',greeting:'Hey there! I was just looking at the stars. Do you have a favourite constellation?',emoji:'🌙'},
   {id:'kai',name:'Kai',age:24,personality:'witty, adventurous, confident',desc:'A traveller who always has one more secret destination.',greeting:'You look like someone who could use an adventure. Am I right?',emoji:'🧭'},
@@ -431,7 +543,7 @@ async function sendMessage(){
 
     const response=await fetch('/.netlify/functions/chat',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'application/json',...(accessToken?{'Authorization':'Bearer '+accessToken}:{})},
       body:JSON.stringify({
         character:{
           name:character.name,
@@ -558,6 +670,7 @@ function renderStory(){
 
 renderFeatured();
 renderChars();
+bootAuth();
 
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
