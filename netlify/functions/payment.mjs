@@ -10,7 +10,7 @@ const PACKAGES = {
   mega: { amount: 70000, coins: 50000 }
 };
 
-async function getUser(req) {
+async function getUser(req, env) {
   const supabaseUrl = env.SUPABASE_URL;
   const anonKey = env.SUPABASE_ANON_KEY;
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
@@ -56,7 +56,7 @@ export default async (req, runtimeContext = {}) => {
   if (!keyId || !keySecret) return json({ error: "Razorpay is not configured yet. Add the Razorpay API keys in your hosting settings." }, 503);
 
   try {
-    const auth = await getUser(req);
+    const auth = await getUser(req, env);
     if (auth.error) return auth.error;
     const { user, supabaseUrl, serviceKey } = auth;
     const body = await req.json();
