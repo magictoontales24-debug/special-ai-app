@@ -92,7 +92,8 @@ const characters=[
 {id:'samir',name:'Samir',gender:'male',age:27,personality:'Patient • Wise • Gentle',desc:'A mountain guide who finds peace in helping others find their way.',greeting:'The climb is difficult, but the view is worth it. Trust me.',genre:'Adventure',image:'https://i.pravatar.cc/700?img=4',story:'she-hates-me'},
 {id:'adrian',name:'Adrian',gender:'male',age:28,personality:'Elegant • Secretive • Charismatic',desc:'A collector of rare artefacts with a dangerous unfinished deal.',greeting:'That artefact is not what it seems. Keep your hands away.',genre:'Mystery',image:'https://i.pravatar.cc/700?img=9',story:'she-hates-me'},
 {id:'rohan',name:'Rohan',gender:'male',age:20,personality:'Funny • Loyal • Energetic',desc:'Your childhood best friend and partner in ridiculous schemes.',greeting:'I have snacks, a terrible idea, and exactly zero regrets.',genre:'Comedy',image:'https://i.pravatar.cc/700?img=14',story:'she-hates-me'}
-];
+,
+{id:'vihaan',name:'Vihaan',gender:'male',age:23,personality:'Calm • Protective • Secretly funny',desc:'An architecture student who sketches places he hopes to visit with you.',greeting:'I found a quiet rooftop with the best view. Thought you might like it.',genre:'Romance',image:'https://i.pravatar.cc/700?img=68',story:'she-hates-me'}];
 let chats=load('special_chats',{}),relationships=load('special_relationships',{}),moods=load('special_moods',{});
 let walletData={balance:null,transactions:[],nextDay:1,claimedToday:false};
 function load(k,f){try{return JSON.parse(localStorage.getItem(k))??f}catch{return f}}
