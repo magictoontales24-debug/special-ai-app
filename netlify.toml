@@ -4,3 +4,28 @@
 
 [functions]
   node_bundler = "esbuild"
+
+# Route the frontend's /api/* requests to the matching Netlify Functions.
+[[redirects]]
+  from = "/api/auth-config"
+  to = "/.netlify/functions/auth-config"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/chat"
+  to = "/.netlify/functions/chat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/wallet"
+  to = "/.netlify/functions/wallet"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/payment"
+  to = "/.netlify/functions/payment"
+  status = 200
+  force = true
