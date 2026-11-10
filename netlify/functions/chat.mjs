@@ -51,32 +51,90 @@ export default async (req, runtimeContext = {}) => {
 
     const body = await req.json();
     const character = body.character || {};
+    const characterId = String(character.id || body.characterId || "").trim().slice(0, 80);
+    if (!characterId) return json({ error: "Missing character ID" }, 400);
+
+    const dbHeaders = {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json"
+    };
+
+    // Fetch cloud history for this signed-in user and character.
+    const conversationUrl = `${supabaseUrl}/rest/v1/special_cloud_conversations?select=id,character_name&user_id=eq.${encodeURIComponent(user.id)}&character_id=eq.${encodeURIComponent(characterId)}&limit=1`;
+    const conversationResponse = await fetch(conversationUrl, { headers: dbHeaders });
+    if (!conversationResponse.ok) {
+      console.error("Cloud conversation lookup failed:", await conversationResponse.text());
+      return json({ error: "Cloud memory is not ready. Please run the SPECIAL cloud memory SQL in Supabase first." }, 503);
+    }
+    let cloudConversation = (await conversationResponse.json())[0] || null;
+
+    if (body.action === "history") {
+      if (!cloudConversation) return json({ history: [], memory: "" });
+      const messagesUrl = `${supabaseUrl}/rest/v1/special_cloud_messages?select=role,content,created_at&conversation_id=eq.${encodeURIComponent(cloudConversation.id)}&user_id=eq.${encodeURIComponent(user.id)}&order=created_at.desc&limit=40`;
+      const memoryUrl = `${supabaseUrl}/rest/v1/special_cloud_character_memory?select=memory_text&user_id=eq.${encodeURIComponent(user.id)}&character_id=eq.${encodeURIComponent(characterId)}&limit=1`;
+      const [messagesResponse, memoryResponse] = await Promise.all([
+        fetch(messagesUrl, { headers: dbHeaders }),
+        fetch(memoryUrl, { headers: dbHeaders })
+      ]);
+      if (!messagesResponse.ok || !memoryResponse.ok) return json({ error: "Could not load cloud memory." }, 502);
+      const rows = await messagesResponse.json();
+      const memories = await memoryResponse.json();
+      return json({
+        history: rows.reverse().map(row => ({ who: row.role === "model" ? "bot" : "me", text: row.content })),
+        memory: memories[0]?.memory_text || ""
+      });
+    }
 
     const name = String(character.name || "").trim().slice(0, 80);
     const personality = String(character.personality || "Friendly and caring").slice(0, 500);
     const description = String(character.description || "").slice(0, 1200);
     const genre = String(character.genre || "Roleplay").slice(0, 80);
     const greeting = String(character.greeting || "").slice(0, 500);
-    const characterId = String(character.id || "").slice(0, 80);
-
-    const history = Array.isArray(body.history)
-      ? body.history.slice(-20)
-      : [];
+    const history = Array.isArray(body.history) ? body.history.slice(-20) : [];
 
     if (!name || !history.length) {
       return json({ error: "Missing character or message" }, 400);
     }
 
-    const contents = history
-      .filter(m => m && String(m.text || "").trim())
-      .map(m => ({
-        role: ["model", "assistant"].includes(m.role) ? "model" : "user",
-        parts: [{ text: String(m.text).slice(0, 3000) }]
-      }));
-
-    if (!contents.length || contents[contents.length - 1].role !== "user") {
+    if (!history.length || !String(history[history.length - 1]?.text || "").trim()) {
       return json({ error: "Please send a message first" }, 400);
     }
+
+    // Create a conversation lazily; the unique key prevents duplicate threads.
+    if (!cloudConversation) {
+      const createResponse = await fetch(`${supabaseUrl}/rest/v1/special_cloud_conversations`, {
+        method: "POST",
+        headers: { ...dbHeaders, Prefer: "resolution=ignore-duplicates,return=representation" },
+        body: JSON.stringify({ user_id: user.id, character_id: characterId, character_name: name })
+      });
+      if (!createResponse.ok) {
+        console.error("Cloud conversation create failed:", await createResponse.text());
+        return json({ error: "Could not create cloud conversation." }, 502);
+      }
+      const created = await createResponse.json();
+      cloudConversation = created[0] || null;
+      if (!cloudConversation) {
+        const retry = await fetch(conversationUrl, { headers: dbHeaders });
+        cloudConversation = (await retry.json())[0] || null;
+      }
+    }
+    if (!cloudConversation?.id) return json({ error: "Cloud conversation could not be opened." }, 502);
+
+    const priorUrl = `${supabaseUrl}/rest/v1/special_cloud_messages?select=role,content&conversation_id=eq.${encodeURIComponent(cloudConversation.id)}&user_id=eq.${encodeURIComponent(user.id)}&order=created_at.desc&limit=30`;
+    const priorResponse = await fetch(priorUrl, { headers: dbHeaders });
+    if (!priorResponse.ok) {
+      console.error("Cloud history fetch failed:", await priorResponse.text());
+      return json({ error: "Could not load your saved conversation." }, 502);
+    }
+    const priorRows = (await priorResponse.json()).reverse();
+    const latestUserText = String(history[history.length - 1].text).slice(0, 3000);
+    const combined = priorRows.map(row => ({ role: row.role, text: row.content }));
+    combined.push({ role: "user", text: latestUserText });
+    const contents = combined.slice(-30).map(m => ({
+      role: m.role === "model" ? "model" : "user",
+      parts: [{ text: String(m.text).slice(0, 3000) }]
+    }));
 
     const love = Math.max(0, Math.min(100, Number(body.relationship?.love) || 0));
     const hate = Math.max(0, Math.min(100, Number(body.relationship?.hate) || 0));
@@ -246,6 +304,25 @@ happy, shy, romantic, sad, angry, jealous, excited, caring, neutral.
       "happy", "shy", "romantic", "sad", "angry",
       "jealous", "excited", "caring", "neutral"
     ];
+
+    // Persist both sides of the successful exchange for cross-device continuity.
+    const saveResponse = await fetch(`${supabaseUrl}/rest/v1/special_cloud_messages`, {
+      method: "POST",
+      headers: { ...dbHeaders, Prefer: "return=minimal" },
+      body: JSON.stringify([
+        { conversation_id: cloudConversation.id, user_id: user.id, role: "user", content: latestUserText },
+        { conversation_id: cloudConversation.id, user_id: user.id, role: "model", content: ai.reply.trim().slice(0, 5000) }
+      ])
+    });
+    if (!saveResponse.ok) {
+      console.error("Cloud message save failed:", await saveResponse.text());
+      return json({ error: "Reply generated but could not be saved to cloud memory. Please try again." }, 502);
+    }
+    await fetch(`${supabaseUrl}/rest/v1/special_cloud_conversations?id=eq.${encodeURIComponent(cloudConversation.id)}&user_id=eq.${encodeURIComponent(user.id)}`, {
+      method: "PATCH",
+      headers: { ...dbHeaders, Prefer: "return=minimal" },
+      body: JSON.stringify({ updated_at: new Date().toISOString(), character_name: name })
+    });
 
     return json({
       reply: ai.reply.trim().slice(0, 5000),
