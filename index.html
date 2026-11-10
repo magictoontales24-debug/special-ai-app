@@ -112,8 +112,35 @@ function openCharacter(id){const c=characters.find(x=>x.id===id);if(!c)return;se
 function postComment(){const el=document.getElementById('commentInput');if(!el.value.trim())return;const div=document.createElement('div');div.className='comment';div.innerHTML='<div class="creator-avatar" style="display:grid;place-items:center">✦</div><div class="comment-body"><b>You</b> <small>just now</small><div></div></div>';div.querySelector('.comment-body div').textContent=el.value;document.getElementById('comments').prepend(div);el.value=''}
 function shareStory(){if(navigator.share)navigator.share({title:selectedStory.title,text:selectedStory.about}).catch(()=>{});else navigator.clipboard?.writeText(location.href)}
 function getRel(id){return relationships[id]||(relationships[id]={love:50,hate:0})}
-function startChatFromId(id){selectedCharacterId=id;const c=characters.find(x=>x.id===id)||characters[0];current=c;if(!chats[id])chats[id]=[{who:'bot',text:c.greeting}];save();document.getElementById('chatAvatar').src=c.image;document.getElementById('chatTitle').textContent=c.name;document.getElementById('chatSubtitle').textContent=c.personality;document.getElementById('messageInput').value='';renderChat();show('chat')}
-function goBackFromChat(){show('detail')}
+async function startChatFromId(id){
+ selectedCharacterId=id;
+ const c=characters.find(x=>x.id===id)||characters[0];
+ current=c;
+ if(!chats[id])chats[id]=[{who:'bot',text:c.greeting}];
+ save();
+ document.getElementById('chatAvatar').src=c.image;
+ document.getElementById('chatTitle').textContent=c.name;
+ document.getElementById('chatSubtitle').textContent=c.personality;
+ document.getElementById('messageInput').value='';
+ renderChat();
+ show('chat');
+ if(accessToken){
+  document.getElementById('chatStatus').textContent='Syncing cloud memory…';
+  try{
+   const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},body:JSON.stringify({action:'history',characterId:id})});
+   const data=await response.json();
+   if(!response.ok)throw new Error(data.error||'Cloud memory unavailable');
+   if(Array.isArray(data.history)&&data.history.length){
+    chats[id]=[{who:'bot',text:c.greeting},...data.history];
+    save();
+    renderChat();
+   }
+   document.getElementById('chatStatus').textContent='';
+  }catch(error){
+   document.getElementById('chatStatus').textContent='Cloud sync: '+error.message;
+  }
+ }
+}function goBackFromChat(){show('detail')}
 function renderChat(){if(!current)return;document.getElementById('chatArea').innerHTML=(chats[current.id]||[]).map(m=>'<div class="bubble '+(m.who==='me'?'me':'bot')+'">'+esc(m.text)+'</div>').join('');document.getElementById('chatArea').scrollTop=999999;const r=getRel(current.id);document.getElementById('loveValue').textContent='♡ '+r.love;document.getElementById('hateValue').textContent='♧ '+r.hate;document.getElementById('moodValue').textContent='Mood: '+(moods[current.id]||'neutral')}
 async function sendMessage(){const input=document.getElementById('messageInput'),value=input.value.trim();if(!value||!current||sending)return;if(!accessToken){document.getElementById('chatStatus').textContent='Please sign in to chat.';return}const id=current.id,c=current;chats[id].push({who:'me',text:value});input.value='';save();renderChat();sending=true;document.getElementById('sendButton').disabled=true;document.getElementById('chatStatus').textContent=c.name+' is thinking…';try{const history=chats[id].slice(-20).map(m=>({role:m.who==='me'?'user':'model',text:m.text}));const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},body:JSON.stringify({character:{id:c.id,name:c.name,gender:c.gender,age:c.age,personality:c.personality,description:c.desc,genre:c.genre,greeting:c.greeting},history,relationship:getRel(id)})});const data=await res.json();if(!res.ok)throw new Error(data.error||'AI service unavailable');chats[id].push({who:'bot',text:data.reply});if(data.relationship)relationships[id]=data.relationship;if(data.mood)moods[id]=data.mood;if(data.balance!=null){document.getElementById('headerCoins').textContent=Number(data.balance).toLocaleString('en-IN')}}catch(e){chats[id].push({who:'bot',text:'Connection mein thodi problem aa gayi. Please dobara try karo.'});document.getElementById('chatStatus').textContent=e.message}finally{save();renderChat();sending=false;document.getElementById('sendButton').disabled=false;if(!document.getElementById('chatStatus').textContent.includes('problem'))document.getElementById('chatStatus').textContent=''}}
 function renderChatList(){const ids=Object.keys(chats).filter(id=>chats[id]?.length);document.getElementById('chatList').innerHTML=ids.length?ids.map(id=>{const c=characters.find(x=>x.id===id);return c?'<div class="panel creator" onclick="startChatFromId(\''+id+'\')"><img class="creator-avatar" src="'+c.image+'"><div><b>'+esc(c.name)+'</b><div class="muted">'+esc(chats[id].at(-1)?.text||'Continue chat').slice(0,70)+'</div></div></div>':''}).join(''):'<div class="empty">No conversations yet. Explore a story to begin.</div>'}
