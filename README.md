@@ -1,12 +1,48 @@
-# SPECIAL — AI-enabled web app
+# SPECIAL — AI roleplay and story app
 
-## Deploy to Netlify
-1. Keep the Netlify environment variable `GEMINI_API_KEY` configured for Production and Functions. Never put the key in `index.html` or share it.
-2. Upload the **contents of this folder** (the `index.html`, `manifest.json`, `sw.js`, `icons` folder, and `netlify` folder) to the existing Netlify site's manual deploy area.
-3. Wait for the production deploy to finish, then open the existing site URL.
-4. If the installed app still shows the old version, close it fully and reopen; if needed, clear the site's cached data in Chrome and reinstall.
+SPECIAL is a mobile-friendly web app for fictional character chats, story discovery, account sign-in, cloud conversation history, a coin wallet, daily rewards and Razorpay checkout.
 
-The chat function uses Gemini 3.8 Flash via a Netlify Function. API availability, free-tier eligibility, quotas and charges are controlled by Google. Do not promise unlimited free use.
+## Current deployment target: Cloudflare Workers
 
-## Privacy and safety
-This prototype stores chat history locally in the browser. Messages are sent to Google's Gemini API for replies. Do not enter highly sensitive personal information. SPECIAL is not a therapist, medical service, or emergency service. Before inviting the public, add a privacy policy, terms, abuse reporting, rate limits, moderation, and appropriate age controls.
+The repository includes a Cloudflare Worker entry point (`worker.js`) and Wrangler configuration (`wrangler.toml`). The Worker serves the static app from `public/` and forwards `/api/*` requests to the backend handlers in `netlify/functions/`.
+
+### Cloudflare Workers Builds
+
+- Connect this GitHub repository and use production branch `main`.
+- Build/deploy command: `npx wrangler deploy`.
+- Keep the repository root as the root directory.
+- The static asset directory is configured as `./public` in `wrangler.toml`; do not set a separate output directory.
+
+### Required Worker secrets / variables
+
+Add these in the Cloudflare Worker settings. Netlify environment variables do not transfer automatically.
+
+| Name | Type |
+| --- | --- |
+| `SUPABASE_URL` | Variable |
+| `SUPABASE_ANON_KEY` | Variable |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret |
+| `GEMINI_API_KEY` | Secret |
+| `RAZORPAY_KEY_ID` | Variable (when enabling payments) |
+| `RAZORPAY_KEY_SECRET` | Secret (when enabling payments) |
+
+Never put service-role, Gemini, or Razorpay secret keys in frontend files or commit them to GitHub.
+
+## Supabase
+
+The migration in `supabase/migrations/20261110_special_cloud_memory.sql` creates the additive SPECIAL cloud conversation, message, and per-character memory tables. Run it in the existing Supabase project's SQL Editor if it has not already been applied.
+
+The app also expects the existing wallet schema and RPC functions used by the wallet and chat handlers. Razorpay checkout additionally expects a `special_payment_orders` table and the `special_credit_razorpay_order` RPC. Verify those database objects exist before enabling live payments; the payment handler deliberately does not credit coins until the payment is signature-verified and confirmed captured by Razorpay.
+
+## API routes
+
+- `GET /api/auth-config` — public Supabase client configuration
+- `POST /api/chat` — authenticated AI chat, cloud history, and 10-coin successful-reply charge
+- `GET /api/wallet` — wallet balance, transactions and reward status
+- `POST /api/wallet` — claim the daily reward
+- `POST /api/payment` — create and verify Razorpay orders
+- `POST /api/generate-image` — image generation endpoint
+
+## Before inviting users
+
+Run end-to-end checks for sign-up/sign-in, chat, cloud history across devices, wallet balance, daily rewards, and payment verification in Razorpay test mode. Confirm database policies and RPCs, add a privacy policy and terms, abuse reporting, moderation, rate limits, and suitable age controls. Do not promise unlimited free AI use: provider quotas and charges are controlled by Google.
